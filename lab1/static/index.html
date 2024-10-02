@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Завантаження та аналіз CSV файлу</title>
     <style>
-        body {
+ body {
             font-family: Arial, sans-serif;
             background-color: #f7f7f7;
             margin: 0;
@@ -38,10 +38,6 @@
             border-radius: 5px;
         }
 
-        input[type="file"], input[type="text"] {
-            margin-top: 5px;
-        }
-
         button {
             background-color: #28a745;
             color: white;
@@ -58,23 +54,19 @@
             margin-top: 40px;
         }
 
-        table {
-            border-collapse: collapse;
-            width: 100%;
+        .flower-container {
+            display: flex;
+            flex-direction: column;
             margin-bottom: 20px;
         }
 
-        table, th, td {
-            border: 1px solid #ddd;
-        }
-
-        th, td {
-            padding: 10px;
-            text-align: center;
-        }
-
-        th {
-            background-color: #f2f2f2;
+        .flower-box {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin: 5px 0;
+            cursor: move;
         }
 
         #result p {
@@ -104,6 +96,23 @@
             border: 1px solid #c3e6cb;
             border-radius: 5px;
         }
+
+        #comparison-matrix {
+            margin-top: 20px;
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        #comparison-matrix th, #comparison-matrix td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+
+        #comparison-matrix th {
+            background-color: #007bff;
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -111,14 +120,19 @@
 
     <form id="upload-form" enctype="multipart/form-data">
         <label for="file">Оберіть CSV файл:</label>
-        <input type="file" id="file" name="file" accept=".csv" required>
+        <input type="file" id="file" name="file" accept=".csv" >
+        <button type="submit">Завантажити файл</button>
 
         <label for="new_flower">Додати нову квітку (назва):</label>
         <input type="text" id="new_flower" name="new_flower">
 
+        <button type="button" id="add-flower">Додати квітку</button>
+
         <label for="remove_flower">Видалити квітку (назва):</label>
         <input type="text" id="remove_flower" name="remove_flower">
-        <button type="submit">Завантажити файл</button>
+
+        <button type="button" id="remove-flower">Видалити квітку</button>
+
     </form>
 
     <div id="success-message" style="display: none;">
@@ -126,16 +140,20 @@
     </div>
 
     <h2>Результати</h2>
-    <div id="result"></div>
+    <div id="result" class="flower-container"></div>
+
+    <h2>Матриця порівнянь</h2>
+    <table id="comparison-matrix"></table>
 
     <script>
         const form = document.getElementById('upload-form');
         const successMessage = document.getElementById('success-message');
+        let flowerRanking = [];
+        let draggedFlower = null;
 
         form.addEventListener('submit', async (event) => {
             event.preventDefault();
-
-            successMessage.style.display = 'none';  // Сховати повідомлення про успіх
+            successMessage.style.display = 'none';
 
             const formData = new FormData(form);
             const response = await fetch('/upload/', {
@@ -144,27 +162,111 @@
             });
 
             const result = await response.json();
-            const resultDiv = document.getElementById('result');
-
-            // Очищуємо попередній результат
-            resultDiv.innerHTML = '';
-
-            // Показуємо таблицю даний
-            resultDiv.innerHTML += `<h3>Матриця оцінки експерта</h3>${result.matrix}`;
-
-
-            // Показуємо таблицю попарних порівнянь
-            resultDiv.innerHTML += `<h3>Матриця попарних порівнянь</h3>${result.comparison_matrix}`;
-
-            // Показуємо найкраще ранжування квіток
-            resultDiv.innerHTML += `<h3>Найкраще ранжування квіток</h3><p>${result.best_ranking.join(', ')}</p>`;
-
-            // Додаємо посилання на завантаження CSV файлу
-            resultDiv.innerHTML += `<a href="${result.file_url}" download>Завантажити матрицю попарних порівнянь (CSV)</a>`;
-
-            // Показуємо повідомлення про успішну обробку
+            flowerRanking = result.flower_list;
+            updateFlowerDisplay();
             successMessage.style.display = 'block';
         });
+
+        document.getElementById('add-flower').addEventListener('click', () => {
+            const newFlower = document.getElementById('new_flower').value.trim();
+            if (newFlower) {
+                flowerRanking.push(newFlower); // Додаємо нову квітку до списку
+                document.getElementById('new_flower').value = ''; // Очищення поля
+                updateFlowerDisplay(); // Оновлення відображення
+                updateComparisonMatrix(); // Оновлення матриці порівнянь
+            }
+        });
+
+        document.getElementById('remove-flower').addEventListener('click', () => {
+            const removeFlower = document.getElementById('remove_flower').value.trim();
+            if (removeFlower && flowerRanking.includes(removeFlower)) {
+                flowerRanking = flowerRanking.filter(flower => flower !== removeFlower); // Видалення квітки зі списку
+                document.getElementById('remove_flower').value = ''; // Очищення поля
+                updateFlowerDisplay(); // Оновлення відображення
+                updateComparisonMatrix(); // Оновлення матриці порівнянь
+            }
+        });
+
+        function updateFlowerDisplay() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '';
+
+            flowerRanking.forEach(flower => {
+                const flowerBox = document.createElement('div');
+                flowerBox.className = 'flower-box';
+                flowerBox.draggable = true;
+                flowerBox.innerText = flower;
+
+                flowerBox.addEventListener('dragstart', (event) => {
+                    draggedFlower = flower;
+                    event.dataTransfer.effectAllowed = 'move';
+                    event.dataTransfer.setData('text/plain', flower);
+                });
+
+                flowerBox.addEventListener('dragover', (event) => {
+                    event.preventDefault();
+                });
+
+                flowerBox.addEventListener('drop', (event) => {
+                    event.preventDefault();
+                    const targetFlower = flower;
+                    if (draggedFlower && draggedFlower !== targetFlower) {
+                        const draggedIndex = flowerRanking.indexOf(draggedFlower);
+                        const targetIndex = flowerRanking.indexOf(targetFlower);
+
+                        flowerRanking.splice(draggedIndex, 1);
+                        flowerRanking.splice(targetIndex, 0, draggedFlower);
+
+                        updateFlowerDisplay(); // Оновлення відображення
+                        updateComparisonMatrix(); // Оновлення матриці порівнянь
+                    }
+                });
+
+                resultDiv.appendChild(flowerBox);
+            });
+
+            updateComparisonMatrix(); // Оновлення матриці порівнянь
+        }
+
+        function updateComparisonMatrix() {
+            const matrix = document.getElementById('comparison-matrix');
+            matrix.innerHTML = '';
+
+            // Заголовки матриці
+            const headerRow = document.createElement('tr');
+            headerRow.appendChild(document.createElement('th')); // Пустий кутовий елемент
+
+            flowerRanking.forEach(flower => {
+                const th = document.createElement('th');
+                th.innerText = flower;
+                headerRow.appendChild(th);
+            });
+            matrix.appendChild(headerRow);
+
+            // Додавання рядків матриці
+            flowerRanking.forEach((flowerA, i) => {
+                const row = document.createElement('tr');
+                const th = document.createElement('th');
+                th.innerText = flowerA;
+                row.appendChild(th);
+
+                flowerRanking.forEach((flowerB, j) => {
+                    const cell = document.createElement('td');
+
+                    // Логіка заповнення комірок
+                    if (i < j) {
+                        cell.innerText = '1' // flowerA краще flowerB
+                    } else if (i > j) {
+                        cell.innerText = '-1' // flowerA гірше flowerB
+                    } else {
+                        cell.innerText = '0' // Вони однакові
+                    }
+
+                    row.appendChild(cell);
+                });
+                matrix.appendChild(row);
+            });
+        }
     </script>
 </body>
 </html>

@@ -23,11 +23,11 @@ def pairwise_comparison(ratings, data):
     for i in range(n):
         for j in range(i + 1, n):
             # Порівняння оцінок квіток i та j
-            if ratings[i] > ratings[j]:
+            if ratings[i] < ratings[j]:
                 comparison_matrix[i, j] = 1  # i краще j
                 comparison_matrix[j, i] = -1  # j гірше i
                 logging.info(f'Порівняння: {data.iloc[i, 0]} краще {data.iloc[j, 0]}')
-            elif ratings[i] < ratings[j]:
+            elif ratings[i] > ratings[j]:
                 comparison_matrix[i, j] = -1  # i гірше j
                 comparison_matrix[j, i] = 1  # j краще i
                 logging.info(f'Порівняння: {data.iloc[j, 0]} краще {data.iloc[i, 0]}')
@@ -51,21 +51,27 @@ def rank_objects(matrix):
 async def upload_csv(file: UploadFile = File(...), new_flower: str = Form(None), remove_flower: str = Form(None)):
     # Читання CSV файлу
     contents = await file.read()
-    df = pd.read_csv(io.BytesIO(contents))
+    flower_list = contents.decode('utf-8').split(',')  # Перетворюємо байти в список квіток
 
-    # Додавання нового рядка
+    # Створюємо DataFrame з індексами і квітками
+    df = pd.DataFrame({'Індекс': range(len(flower_list)), 'Квітка': flower_list})
+    df['Індекс'] = df['Індекс'].astype(float)  # Перетворення на int
+
+    # Додавання нового об'єкта
     if new_flower:
-        flower, rate = new_flower.split(",")
-        new_row = pd.DataFrame({df.columns[0]: [flower], 'Дівчина1': [float(rate)]})  # Перетворюємо оцінку на float
+        new_row = pd.DataFrame({'Індекс': [len(df)], 'Квітка': [new_flower]})
         df = pd.concat([df, new_row], ignore_index=True)
 
     # Видалення рядка
-    if remove_flower and remove_flower in df[df.columns[0]].values:
-        df = df[df[df.columns[0]] != remove_flower]
+    if remove_flower and remove_flower in df['Квітка'].values:
+        df = df[df['Квітка'] != remove_flower]
+
+    # Виводимо або повертаємо результат
+    print(df)
 
     # Рейтинги квіток однієї дівчини
-    girl = 'Дівчина1'
-    ratings = df[girl].values
+    girl = 'Індекс'
+    ratings = df[girl].values.tolist()
 
     # Генерація матриці попарних порівнянь
     pairwise_matrix = pairwise_comparison(ratings, df)
@@ -82,6 +88,7 @@ async def upload_csv(file: UploadFile = File(...), new_flower: str = Form(None),
 
     # Повертаємо дані для відображення та можливість завантажити файл
     return {
+        'flower_list': flower_list,
         "fields": list(df.columns),
         "best_ranking": best_ranking,
         "matrix": df.to_html(),  # Перетворюємо матрицю на HTML таблицю
