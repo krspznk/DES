@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Завантаження та аналіз CSV файлу</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f7f7f7;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        form {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            margin-bottom: 20px;
+        }
+
+        label, input[type="file"], input[type="text"], button {
+            display: block;
+            width: 100%;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        input[type="file"], input[type="text"], button {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        input[type="file"], input[type="text"] {
+            margin-top: 5px;
+        }
+
+        button {
+            background-color: #28a745;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+        }
+
+        button:hover {
+            background-color: #218838;
+        }
+
+        h2 {
+            margin-top: 40px;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+
+        th, td {
+            padding: 10px;
+            text-align: center;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        #result p {
+            font-size: 18px;
+            margin-top: 20px;
+        }
+
+        #result a {
+            display: inline-block;
+            margin-top: 20px;
+            text-decoration: none;
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+        }
+
+        #result a:hover {
+            background-color: #0056b3;
+        }
+
+        #success-message {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 1px solid #c3e6cb;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Завантаження CSV файлу та попарне порівняння</h1>
+
+    <form id="upload-form" enctype="multipart/form-data">
+        <label for="file">Оберіть CSV файл:</label>
+        <input type="file" id="file" name="file" accept=".csv" required>
+
+        <label for="new_flower">Додати нову квітку (назва):</label>
+        <input type="text" id="new_flower" name="new_flower">
+
+        <label for="remove_flower">Видалити квітку (назва):</label>
+        <input type="text" id="remove_flower" name="remove_flower">
+        <button type="submit">Завантажити файл</button>
+    </form>
+
+    <div id="success-message" style="display: none;">
+        Файл успішно завантажено і оброблено!
+    </div>
+
+    <h2>Результати</h2>
+    <div id="result"></div>
+
+    <script>
+        const form = document.getElementById('upload-form');
+        const successMessage = document.getElementById('success-message');
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            successMessage.style.display = 'none';  // Сховати повідомлення про успіх
+
+            const formData = new FormData(form);
+            const response = await fetch('/upload/', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+            const resultDiv = document.getElementById('result');
+
+            // Очищуємо попередній результат
+            resultDiv.innerHTML = '';
+
+            // Показуємо таблицю даний
+            resultDiv.innerHTML += `<h3>Матриця оцінки експерта</h3>${result.matrix}`;
+
+
+            // Показуємо таблицю попарних порівнянь
+            resultDiv.innerHTML += `<h3>Матриця попарних порівнянь</h3>${result.comparison_matrix}`;
+
+            // Показуємо найкраще ранжування квіток
+            resultDiv.innerHTML += `<h3>Найкраще ранжування квіток</h3><p>${result.best_ranking.join(', ')}</p>`;
+
+            // Додаємо посилання на завантаження CSV файлу
+            resultDiv.innerHTML += `<a href="${result.file_url}" download>Завантажити матрицю попарних порівнянь (CSV)</a>`;
+
+            // Показуємо повідомлення про успішну обробку
+            successMessage.style.display = 'block';
+        });
+    </script>
+</body>
+</html>
